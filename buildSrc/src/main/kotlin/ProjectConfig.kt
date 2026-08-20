@@ -9,7 +9,9 @@ const val NEWPIPE_VERSION_SDK_MIN = 23
 const val NEWPIPE_VERSION_SDK_TARGET = 35
 
 const val NEWPIPE_VERSION_CODE = 1015
-const val NEWPIPE_VERSION_NAME = "0.29.1"
+// OLD: const val NEWPIPE_VERSION_NAME = "0.29.1"
+// TPO: patch version (starting with 101)
+const val NEWPIPE_VERSION_NAME = "0.29.101"
 
 const val NEWPIPE_APPLICATION_ID_OLD = "org.schabi.newpipe"
 const val NEWPIPE_APPLICATION_ID_NEW = "net.newpipe.app"
