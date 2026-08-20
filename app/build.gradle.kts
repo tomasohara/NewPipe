@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+// TPO:
+// note:
+// - Trying for minimal change to allow for PR's. so newpipe mostly retained in codebase
+// - Application ID change to allow for installations of original and my version
+// - Archive basename set to tom[newpipe]" for sake of APK creation.
+//
+
 import com.android.build.api.dsl.ApplicationExtension
 import java.util.regex.Pattern
 
@@ -39,7 +46,10 @@ configure<ApplicationExtension> {
     namespace = NEWPIPE_APPLICATION_ID_OLD
 
     defaultConfig {
-        applicationId = NEWPIPE_APPLICATION_ID_OLD
+        // TPO:
+        // OLD: applicationId = NEWPIPE_APPLICATION_ID_OLD
+	applicationId = "tom" + NEWPIPE_APPLICATION_ID_OLD
+
         resValue("string", "app_name", "NewPipe")
         minSdk {
             version = release(NEWPIPE_VERSION_SDK_MIN)
@@ -341,4 +351,9 @@ aboutLibraries {
             Pattern.compile("^com\\.evernote:android-state$")
         )
     }
+}
+
+// TPO:
+base {
+    archivesName.set("tomnewpipe")
 }
