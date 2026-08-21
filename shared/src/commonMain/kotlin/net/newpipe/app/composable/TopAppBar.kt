@@ -5,6 +5,7 @@
 
 package net.newpipe.app.composable
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,7 +22,9 @@ import net.newpipe.app.preview.ThemePreviewProvider
 import net.newpipe.app.theme.currentServiceTopAppBarColors
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.ic_arrow_back
+import newpipe.shared.generated.resources.ic_chevron_left
 import newpipe.shared.generated.resources.navigate_back
+import newpipe.shared.generated.resources.system_back
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -31,6 +34,7 @@ import org.jetbrains.compose.resources.stringResource
  * @param title Title of the screen
  * @param navigationIcon Icon for the navigation button
  * @param onNavigateUp Action when user clicks the navigation icon
+ * @param onSystemBack Action when user clicks the system back button
  * @param actions Actions to display on the top app bar (for e.g. menu)
  */
 @Composable
@@ -39,6 +43,7 @@ fun TopAppBar(
     title: String? = null,
     navigationIcon: Painter = painterResource(Res.drawable.ic_arrow_back),
     onNavigateUp: (() -> Unit)? = null,
+    onSystemBack: (() -> Unit)? = null,
     colors: TopAppBarColors = currentServiceTopAppBarColors(),
     actions: @Composable (RowScope.() -> Unit) = {}
 ) {
@@ -47,12 +52,22 @@ fun TopAppBar(
         colors = colors,
         title = { if (title != null) Text(text = title) },
         navigationIcon = {
-            if (onNavigateUp != null) {
-                IconButton(onClick = onNavigateUp) {
-                    Icon(
-                        painter = navigationIcon,
-                        contentDescription = stringResource(Res.string.navigate_back)
-                    )
+            Row {
+                if (onNavigateUp != null) {
+                    IconButton(onClick = onNavigateUp) {
+                        Icon(
+                            painter = navigationIcon,
+                            contentDescription = stringResource(Res.string.navigate_back)
+                        )
+                    }
+                }
+                if (onSystemBack != null) {
+                    IconButton(onClick = onSystemBack) {
+                        Icon(
+                            painter = painterResource(Res.drawable.ic_chevron_left),
+                            contentDescription = stringResource(Res.string.system_back)
+                        )
+                    }
                 }
             }
         },

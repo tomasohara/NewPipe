@@ -6,6 +6,7 @@
 <resources>
     <!-- TopAppBar -->
     <string name="navigate_back">Back</string>
+    <string name="system_back">System back</string>
 
     <!-- AboutScreen -->
     <string name="title_activity_about">About NewPipe</string>

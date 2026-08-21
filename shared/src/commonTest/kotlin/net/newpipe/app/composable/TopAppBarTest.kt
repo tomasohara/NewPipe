@@ -18,6 +18,7 @@ import kotlin.test.assertTrue
 import net.newpipe.app.extensions.withKoin
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.navigate_back
+import newpipe.shared.generated.resources.system_back
 import newpipe.shared.generated.resources.title_activity_about
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -61,6 +62,27 @@ class TopAppBarTest {
                     assertExists()
                     performClick()
                     assertTrue(navigationBackClicked)
+                }
+            }
+        )
+    }
+
+    @Test
+    fun testTopAppBarCanDispatchSystemBack() = runComposeUiTest {
+        var systemBackClicked = false
+        withKoin(
+            modules = listOf(emptySettings),
+            content = {
+                TopAppBar(
+                    onNavigateUp = {},
+                    onSystemBack = { systemBackClicked = true }
+                )
+            },
+            onContent = {
+                onNodeWithContentDescription(getString(Res.string.system_back)).apply {
+                    assertExists()
+                    performClick()
+                    assertTrue(systemBackClicked)
                 }
             }
         )

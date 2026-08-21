@@ -31,7 +31,8 @@ class ComposeActivity : ComponentActivity() {
                 startDestination = Json.decodeFromString<Destination>(
                     intent.getStringExtra(Constants.INTENT_SCREEN_KEY)!!
                 ),
-                onCloseRequest = ::finish
+                onCloseRequest = ::finish,
+                onSystemBack = { onBackPressedDispatcher.onBackPressed() }
             ) {
                 val view = LocalView.current
                 val service = currentService()

@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewWrapper
 import androidx.compose.ui.util.fastForEachIndexed
 import kotlinx.coroutines.launch
+import net.newpipe.app.LocalSystemBack
 import net.newpipe.app.composable.TopAppBar
 import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.preview.ThemePreviewProvider
@@ -35,9 +36,13 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
 @Composable
-fun AboutScreen(navigator: Navigator = koinInject()) {
+fun AboutScreen(
+    onSystemBack: (() -> Unit)? = LocalSystemBack.current,
+    navigator: Navigator = koinInject()
+) {
     AboutScreenContent(
-        onNavigateUp = { navigator.navigateUp() }
+        onNavigateUp = { navigator.navigateUp() },
+        onSystemBack = onSystemBack
     )
 }
 
@@ -45,6 +50,7 @@ fun AboutScreen(navigator: Navigator = koinInject()) {
 fun AboutScreenContent(
     pages: List<Page> = listOf(Page.ABOUT, Page.LICENSE),
     onNavigateUp: () -> Unit = {},
+    onSystemBack: (() -> Unit)? = null,
     serviceScheme: ColorScheme = currentServiceScheme(),
     onPageContent: @Composable (page: Page) -> Unit = { page ->
         when (page) {
@@ -57,7 +63,8 @@ fun AboutScreenContent(
         topBar = {
             TopAppBar(
                 title = stringResource(Res.string.title_activity_about),
-                onNavigateUp = onNavigateUp
+                onNavigateUp = onNavigateUp,
+                onSystemBack = onSystemBack
             )
         }
     ) { paddingValues ->
