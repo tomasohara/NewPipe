@@ -20,6 +20,10 @@ dependencies {
     implementation(libs.jetbrains.compose.preview)
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 compose.desktop {
     application {
         mainClass = "net.newpipe.app.MainKt"
