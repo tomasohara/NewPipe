@@ -20,4 +20,8 @@ sealed interface Destination : NavKey {
 
     @Serializable
     data object About : Destination
+
+    /** Mocked dummy-service home shell; used as the desktop start destination */
+    @Serializable
+    data object DummyHome : Destination
 }

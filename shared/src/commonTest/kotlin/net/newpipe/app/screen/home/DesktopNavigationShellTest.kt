@@ -3,18 +3,31 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+// Test additions facilitated by Claude Code using model Fable 5.
+
 package net.newpipe.app.screen.home
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import net.newpipe.app.navigation.Destination
+import net.newpipe.app.navigation.Navigator
 import newpipe.shared.generated.resources.Res
+import newpipe.shared.generated.resources.downloads
 import newpipe.shared.generated.resources.menu_navigation
+import newpipe.shared.generated.resources.nothing_here_but_crickets
+import newpipe.shared.generated.resources.tab_about
+import newpipe.shared.generated.resources.tab_bookmarks
 import org.jetbrains.compose.resources.getString
 
 @OptIn(ExperimentalTestApi::class)
@@ -34,6 +47,22 @@ class DesktopNavigationShellTest {
     }
 
     @Test
+    fun tabClickUpdatesSelectionAndTitle() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                DesktopNavigationShellContent()
+            }
+        }
+
+        val bookmarksTag = "$TEST_TAG_DUMMY_SERVICE_TAB_PREFIX${DummyServiceTab.BOOKMARKS.name}"
+        onNodeWithTag(bookmarksTag).performClick()
+
+        onNodeWithTag(bookmarksTag).assertIsSelected()
+        onNodeWithTag(TEST_TAG_TOP_BAR_TITLE)
+            .assertTextEquals(getString(Res.string.tab_bookmarks))
+    }
+
+    @Test
     fun drawerShowsAndroidStyleGroupsAndBranding() = runComposeUiTest {
         setContent {
             MaterialTheme {
@@ -47,5 +76,51 @@ class DesktopNavigationShellTest {
         onNodeWithTag(TEST_TAG_DRAWER_TOP_GROUP).assertIsDisplayed()
         onNodeWithTag(TEST_TAG_DRAWER_DUMMY_SERVICE_GROUP).assertIsDisplayed()
         onNodeWithTag(TEST_TAG_DRAWER_BOTTOM_GROUP).assertIsDisplayed()
+    }
+
+    @Test
+    fun drawerPlaceholderItemHidesTabsAndSetsTitle() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                DesktopNavigationShellContent()
+            }
+        }
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithText(getString(Res.string.downloads)).performClick()
+
+        onNodeWithTag(TEST_TAG_TOP_BAR_TITLE)
+            .assertTextEquals(getString(Res.string.downloads))
+        onNodeWithTag("$TEST_TAG_DUMMY_SERVICE_TAB_PREFIX${DummyServiceTab.FEATURED.name}")
+            .assertDoesNotExist()
+        onNodeWithText(getString(Res.string.nothing_here_but_crickets)).assertIsDisplayed()
+    }
+
+    @Test
+    fun drawerNavigationRoutesThroughSharedNavigator() = runComposeUiTest {
+        var closeRequested = false
+        val navigator = Navigator(
+            startDestination = Destination.DummyHome,
+            onCloseRequest = { closeRequested = true }
+        )
+
+        setContent {
+            MaterialTheme {
+                DesktopNavigationShellContent(onNavigate = { navigator.navigateTo(it) })
+            }
+        }
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithText(getString(Res.string.tab_about)).performClick()
+        assertEquals(
+            listOf<Destination>(Destination.DummyHome, Destination.About),
+            navigator.backstack.toList()
+        )
+
+        // Back from About returns to the shell; back from the shell exits
+        navigator.navigateUp()
+        assertEquals(listOf<Destination>(Destination.DummyHome), navigator.backstack.toList())
+        navigator.navigateUp()
+        assertTrue(closeRequested)
     }
 }

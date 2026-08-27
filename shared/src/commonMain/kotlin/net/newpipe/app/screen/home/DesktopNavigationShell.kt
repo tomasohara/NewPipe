@@ -3,10 +3,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+// Desktop-only navigation shell: mocks the Android main navigation (home tabs
+// plus hamburger drawer) for a dummy streaming service. Real destinations are
+// routed through the shared Navigator, so a feature that becomes real in
+// shared code only needs its DrawerItem flipped from placeholder to
+// destination. Streamlining facilitated by Claude Code using model Fable 5.
+
 package net.newpipe.app.screen.home
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,10 +27,10 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
@@ -37,13 +44,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import net.newpipe.app.screen.about.AboutScreenContent
+import net.newpipe.app.BuildConfig
+import net.newpipe.app.navigation.Destination
+import net.newpipe.app.navigation.Navigator
 import newpipe.shared.generated.resources.Res
-import newpipe.shared.generated.resources.app_name
 import newpipe.shared.generated.resources.bookmarked_playlists
 import newpipe.shared.generated.resources.donate
-import newpipe.shared.generated.resources.dummy_service
 import newpipe.shared.generated.resources.downloads
+import newpipe.shared.generated.resources.dummy_service
 import newpipe.shared.generated.resources.featured
 import newpipe.shared.generated.resources.history
 import newpipe.shared.generated.resources.ic_bookmark
@@ -52,13 +60,13 @@ import newpipe.shared.generated.resources.ic_foreground
 import newpipe.shared.generated.resources.ic_history
 import newpipe.shared.generated.resources.ic_info_outline
 import newpipe.shared.generated.resources.ic_menu
-import newpipe.shared.generated.resources.menu_navigation
 import newpipe.shared.generated.resources.ic_settings
 import newpipe.shared.generated.resources.ic_stars
 import newpipe.shared.generated.resources.ic_subscriptions
 import newpipe.shared.generated.resources.ic_trending_up
 import newpipe.shared.generated.resources.ic_tv
 import newpipe.shared.generated.resources.ic_volunteer_activism
+import newpipe.shared.generated.resources.menu_navigation
 import newpipe.shared.generated.resources.nothing_here_but_crickets
 import newpipe.shared.generated.resources.settings
 import newpipe.shared.generated.resources.tab_about
@@ -67,106 +75,125 @@ import newpipe.shared.generated.resources.tab_subscriptions
 import newpipe.shared.generated.resources.trending
 import newpipe.shared.generated.resources.whats_new
 import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 internal const val TEST_TAG_DUMMY_SERVICE_TAB_PREFIX = "dummy_service_tab_"
+internal const val TEST_TAG_TOP_BAR_TITLE = "top_bar_title"
 internal const val TEST_TAG_DRAWER_TOP_GROUP = "drawer_top_group"
 internal const val TEST_TAG_DRAWER_DUMMY_SERVICE_GROUP = "drawer_dummy_service_group"
 internal const val TEST_TAG_DRAWER_BOTTOM_GROUP = "drawer_bottom_group"
 internal const val TEST_TAG_DRAWER_HEADER = "drawer_header"
 
-private enum class DesktopPage {
-    HOME,
-    PLACEHOLDER,
-    ABOUT
-}
-
+/**
+ * Home tabs of the mocked dummy service, mirroring the Android home tab bar
+ */
 internal enum class DummyServiceTab(
-    val title: @Composable () -> String,
+    val title: StringResource,
     val icon: DrawableResource
 ) {
-    FEATURED({ stringResource(Res.string.featured) }, Res.drawable.ic_stars),
-    WHATS_NEW({ stringResource(Res.string.whats_new) }, Res.drawable.ic_subscriptions),
-    SUBSCRIPTIONS({ stringResource(Res.string.tab_subscriptions) }, Res.drawable.ic_tv),
-    BOOKMARKS({ stringResource(Res.string.tab_bookmarks) }, Res.drawable.ic_bookmark)
+    FEATURED(Res.string.featured, Res.drawable.ic_stars),
+    WHATS_NEW(Res.string.whats_new, Res.drawable.ic_subscriptions),
+    SUBSCRIPTIONS(Res.string.tab_subscriptions, Res.drawable.ic_tv),
+    BOOKMARKS(Res.string.tab_bookmarks, Res.drawable.ic_bookmark)
 }
 
-@Composable
-fun DesktopNavigationShell() {
-    val page = remember { mutableStateOf(DesktopPage.HOME) }
+/**
+ * A drawer entry: navigates to [destination] when set, selects [tab] on the
+ * dummy home when set, and otherwise shows the crickets placeholder
+ */
+private data class DrawerItem(
+    val label: StringResource,
+    val icon: DrawableResource,
+    val destination: Destination? = null,
+    val tab: DummyServiceTab? = null
+)
 
-    when (page.value) {
-        DesktopPage.ABOUT -> AboutScreenContent(onNavigateUp = { page.value = DesktopPage.HOME })
-        DesktopPage.HOME,
-        DesktopPage.PLACEHOLDER -> DesktopNavigationShellContent(
-            showHome = page.value == DesktopPage.HOME,
-            onShowHome = { page.value = DesktopPage.HOME },
-            onShowPlaceholder = { page.value = DesktopPage.PLACEHOLDER },
-            onShowAbout = { page.value = DesktopPage.ABOUT }
-        )
-    }
+// Android-style drawer groups and ordering: local destinations,
+// dummy-service kiosks, and options
+private val topDrawerItems = listOf(
+    DrawerItem(Res.string.tab_subscriptions, Res.drawable.ic_tv),
+    DrawerItem(Res.string.whats_new, Res.drawable.ic_subscriptions),
+    DrawerItem(Res.string.bookmarked_playlists, Res.drawable.ic_bookmark),
+    DrawerItem(Res.string.downloads, Res.drawable.ic_file_download),
+    DrawerItem(Res.string.history, Res.drawable.ic_history)
+)
+
+private val dummyServiceDrawerItems = listOf(
+    DrawerItem(Res.string.featured, Res.drawable.ic_stars, tab = DummyServiceTab.FEATURED),
+    DrawerItem(Res.string.trending, Res.drawable.ic_trending_up)
+)
+
+private val bottomDrawerItems = listOf(
+    DrawerItem(Res.string.settings, Res.drawable.ic_settings, destination = Destination.Settings),
+    DrawerItem(Res.string.donate, Res.drawable.ic_volunteer_activism),
+    DrawerItem(Res.string.tab_about, Res.drawable.ic_info_outline, destination = Destination.About)
+)
+
+/**
+ * Navigation shell registered as [Destination.DummyHome]; real destinations
+ * are pushed onto the shared navigation backstack
+ */
+@Composable
+fun DesktopNavigationShell(navigator: Navigator = koinInject()) {
+    DesktopNavigationShellContent(onNavigate = { navigator.navigateTo(it) })
 }
 
+/**
+ * Stateful shell content: dummy-service tab row, drawer, and placeholder page
+ * @param onNavigate Callback to navigate to a real (non-mocked) destination
+ */
 @Composable
-fun DesktopNavigationShellContent(
-    showHome: Boolean = true,
-    onShowHome: () -> Unit = {},
-    onShowPlaceholder: () -> Unit = {},
-    onShowAbout: () -> Unit = {}
-) {
+internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {}) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val selectedTab = remember { mutableStateOf(DummyServiceTab.FEATURED) }
-    val closeDrawer = { scope.launch { drawerState.close() } }
+    // Non-null while a placeholder-only drawer destination is showing;
+    // null means the dummy-service home (tab row) is showing
+    val placeholderLabel = remember { mutableStateOf<StringResource?>(null) }
+
+    val onDrawerItemClick: (DrawerItem) -> Unit = { item ->
+        when {
+            item.destination != null -> onNavigate(item.destination)
+            item.tab != null -> {
+                selectedTab.value = item.tab
+                placeholderLabel.value = null
+            }
+            else -> placeholderLabel.value = item.label
+        }
+        scope.launch { drawerState.close() }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
                 DrawerHeader()
-                DrawerGroup(
-                    testTag = TEST_TAG_DRAWER_TOP_GROUP,
-                    items = topDrawerItems(),
-                    onItemClick = {
-                        onShowPlaceholder()
-                        closeDrawer()
-                    }
-                )
+                DrawerGroup(TEST_TAG_DRAWER_TOP_GROUP, topDrawerItems, onDrawerItemClick)
                 HorizontalDivider()
                 DrawerGroup(
-                    testTag = TEST_TAG_DRAWER_DUMMY_SERVICE_GROUP,
-                    items = dummyServiceDrawerItems(),
-                    onItemClick = { item ->
-                        if (item.tab == null) {
-                            onShowPlaceholder()
-                        } else {
-                            selectedTab.value = item.tab
-                            onShowHome()
-                        }
-                        closeDrawer()
-                    }
+                    TEST_TAG_DRAWER_DUMMY_SERVICE_GROUP,
+                    dummyServiceDrawerItems,
+                    onDrawerItemClick
                 )
                 HorizontalDivider()
-                DrawerGroup(
-                    testTag = TEST_TAG_DRAWER_BOTTOM_GROUP,
-                    items = bottomDrawerItems(),
-                    onItemClick = { item ->
-                        if (item.isAbout) {
-                            onShowAbout()
-                        } else {
-                            onShowPlaceholder()
-                        }
-                        closeDrawer()
-                    }
-                )
+                DrawerGroup(TEST_TAG_DRAWER_BOTTOM_GROUP, bottomDrawerItems, onDrawerItemClick)
             }
         }
     ) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(selectedTab.value.title()) },
+                    title = {
+                        Text(
+                            modifier = Modifier.testTag(TEST_TAG_TOP_BAR_TITLE),
+                            text = stringResource(
+                                placeholderLabel.value ?: selectedTab.value.title
+                            )
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
                             Icon(
@@ -183,7 +210,7 @@ fun DesktopNavigationShellContent(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                if (showHome) {
+                if (placeholderLabel.value == null) {
                     PrimaryTabRow(
                         modifier = Modifier.fillMaxWidth(),
                         selectedTabIndex = selectedTab.value.ordinal
@@ -229,7 +256,7 @@ private fun DrawerGroup(
                         contentDescription = null
                     )
                 },
-                label = { Text(item.label()) },
+                label = { Text(stringResource(item.label)) },
                 selected = false,
                 onClick = { onItemClick(item) }
             )
@@ -247,7 +274,7 @@ private fun DrawerHeader() {
         contentColor = MaterialTheme.colorScheme.onPrimary
     ) {
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
-            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     modifier = Modifier.size(36.dp),
                     painter = painterResource(Res.drawable.ic_foreground),
@@ -255,11 +282,11 @@ private fun DrawerHeader() {
                 )
                 Text(
                     modifier = Modifier.padding(start = 12.dp),
-                    text = stringResource(Res.string.app_name),
+                    text = BuildConfig.APP_NAME,
                     style = MaterialTheme.typography.titleLarge
                 )
             }
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier.padding(top = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -277,35 +304,6 @@ private fun DrawerHeader() {
         }
     }
 }
-
-private data class DrawerItem(
-    val label: @Composable () -> String,
-    val icon: DrawableResource,
-    val tab: DummyServiceTab? = null,
-    val isAbout: Boolean = false
-)
-
-@Composable
-private fun topDrawerItems() = listOf(
-    DrawerItem({ stringResource(Res.string.tab_subscriptions) }, Res.drawable.ic_tv),
-    DrawerItem({ stringResource(Res.string.whats_new) }, Res.drawable.ic_subscriptions),
-    DrawerItem({ stringResource(Res.string.bookmarked_playlists) }, Res.drawable.ic_bookmark),
-    DrawerItem({ stringResource(Res.string.downloads) }, Res.drawable.ic_file_download),
-    DrawerItem({ stringResource(Res.string.history) }, Res.drawable.ic_history)
-)
-
-@Composable
-private fun dummyServiceDrawerItems() = listOf(
-    DrawerItem({ stringResource(Res.string.featured) }, Res.drawable.ic_stars, DummyServiceTab.FEATURED),
-    DrawerItem({ stringResource(Res.string.trending) }, Res.drawable.ic_trending_up)
-)
-
-@Composable
-private fun bottomDrawerItems() = listOf(
-    DrawerItem({ stringResource(Res.string.settings) }, Res.drawable.ic_settings),
-    DrawerItem({ stringResource(Res.string.donate) }, Res.drawable.ic_volunteer_activism),
-    DrawerItem({ stringResource(Res.string.tab_about) }, Res.drawable.ic_info_outline, isAbout = true)
-)
 
 @Composable
 private fun EmptyPlaceholder() {

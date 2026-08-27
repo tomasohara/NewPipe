@@ -7,7 +7,7 @@ package net.newpipe.app
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import net.newpipe.app.screen.home.DesktopNavigationShell
+import net.newpipe.app.navigation.Destination
 
 /**
  * Entry point for compose-related UI components on Desktop
@@ -15,9 +15,9 @@ import net.newpipe.app.screen.home.DesktopNavigationShell
 fun main() = application {
     Window(onCloseRequest = ::exitApplication, title = "NewPipe") {
         App(
+            startDestination = Destination.DummyHome,
             onCloseRequest = ::exitApplication,
-            onSystemBack = ::exitApplication,
-            navigationContent = { DesktopNavigationShell() }
+            onSystemBack = ::exitApplication
         )
     }
 }

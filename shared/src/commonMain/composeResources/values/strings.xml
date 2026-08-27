@@ -37,7 +37,6 @@
     <string name="not_available">Not available</string>
 
     <!-- Desktop navigation shell -->
-    <string name="app_name">NewPipe</string>
     <string name="dummy_service">Dummy Service</string>
     <string name="featured">Featured</string>
     <string name="trending">Trending</string>
@@ -48,9 +47,7 @@
     <string name="downloads">Downloads</string>
     <string name="history">History</string>
     <string name="donate">Donate</string>
-    <string name="menu_dummy_service">Service</string>
     <string name="menu_navigation">Navigation</string>
-    <string name="menu_options">Options</string>
     <string name="nothing_here_but_crickets">Nothing here but crickets.</string>
 
     <!-- SettingsHomeScreen -->
