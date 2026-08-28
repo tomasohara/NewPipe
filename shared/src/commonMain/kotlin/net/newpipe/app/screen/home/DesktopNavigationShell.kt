@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -47,6 +50,8 @@ import kotlinx.coroutines.launch
 import net.newpipe.app.BuildConfig
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
+import net.newpipe.app.theme.currentServiceScheme
+import net.newpipe.app.theme.currentServiceTopAppBarColors
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.bookmarked_playlists
 import newpipe.shared.generated.resources.donate
@@ -126,8 +131,10 @@ private val dummyServiceDrawerItems = listOf(
     DrawerItem(Res.string.trending, Res.drawable.ic_trending_up)
 )
 
+// Only About & FAQ is wired to a real destination; Settings stays a mocked
+// placeholder for now, same as the rest of the drawer
 private val bottomDrawerItems = listOf(
-    DrawerItem(Res.string.settings, Res.drawable.ic_settings, destination = Destination.Settings),
+    DrawerItem(Res.string.settings, Res.drawable.ic_settings),
     DrawerItem(Res.string.donate, Res.drawable.ic_volunteer_activism),
     DrawerItem(Res.string.tab_about, Res.drawable.ic_info_outline, destination = Destination.About)
 )
@@ -153,6 +160,7 @@ internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {
     // Non-null while a placeholder-only drawer destination is showing;
     // null means the dummy-service home (tab row) is showing
     val placeholderLabel = remember { mutableStateOf<StringResource?>(null) }
+    val serviceScheme = currentServiceScheme()
 
     val onDrawerItemClick: (DrawerItem) -> Unit = { item ->
         when {
@@ -170,22 +178,25 @@ internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
-                DrawerHeader()
-                DrawerGroup(TEST_TAG_DRAWER_TOP_GROUP, topDrawerItems, onDrawerItemClick)
-                HorizontalDivider()
-                DrawerGroup(
-                    TEST_TAG_DRAWER_DUMMY_SERVICE_GROUP,
-                    dummyServiceDrawerItems,
-                    onDrawerItemClick
-                )
-                HorizontalDivider()
-                DrawerGroup(TEST_TAG_DRAWER_BOTTOM_GROUP, bottomDrawerItems, onDrawerItemClick)
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    DrawerHeader(serviceScheme)
+                    DrawerGroup(TEST_TAG_DRAWER_TOP_GROUP, topDrawerItems, onDrawerItemClick)
+                    HorizontalDivider()
+                    DrawerGroup(
+                        TEST_TAG_DRAWER_DUMMY_SERVICE_GROUP,
+                        dummyServiceDrawerItems,
+                        onDrawerItemClick
+                    )
+                    HorizontalDivider()
+                    DrawerGroup(TEST_TAG_DRAWER_BOTTOM_GROUP, bottomDrawerItems, onDrawerItemClick)
+                }
             }
         }
     ) {
         Scaffold(
             topBar = {
                 TopAppBar(
+                    colors = currentServiceTopAppBarColors(serviceScheme),
                     title = {
                         Text(
                             modifier = Modifier.testTag(TEST_TAG_TOP_BAR_TITLE),
@@ -213,7 +224,9 @@ internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {
                 if (placeholderLabel.value == null) {
                     PrimaryTabRow(
                         modifier = Modifier.fillMaxWidth(),
-                        selectedTabIndex = selectedTab.value.ordinal
+                        selectedTabIndex = selectedTab.value.ordinal,
+                        containerColor = serviceScheme.primaryContainer,
+                        contentColor = serviceScheme.onPrimaryContainer
                     ) {
                         DummyServiceTab.entries.forEach { tab ->
                             Tab(
@@ -265,13 +278,13 @@ private fun DrawerGroup(
 }
 
 @Composable
-private fun DrawerHeader() {
+private fun DrawerHeader(serviceScheme: ColorScheme) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(TEST_TAG_DRAWER_HEADER),
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
+        color = serviceScheme.primaryContainer,
+        contentColor = serviceScheme.onPrimaryContainer
     ) {
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -305,14 +318,19 @@ private fun DrawerHeader() {
     }
 }
 
+// Kaomoji is hardcoded (not translated) to match the Android empty-list view
+// at app/src/main/res/layout/list_empty_view.xml
 @Composable
 private fun EmptyPlaceholder() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            modifier = Modifier.padding(24.dp),
-            text = stringResource(Res.string.nothing_here_but_crickets),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "¯\\_(ツ)_/¯", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                modifier = Modifier.padding(top = 6.dp),
+                text = stringResource(Res.string.nothing_here_but_crickets),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }

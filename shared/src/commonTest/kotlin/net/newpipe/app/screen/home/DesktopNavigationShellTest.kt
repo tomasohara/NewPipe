@@ -8,6 +8,7 @@
 package net.newpipe.app.screen.home
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -17,29 +18,45 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
+import com.russhwolf.settings.MapSettings
+import com.russhwolf.settings.Settings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import net.newpipe.app.extensions.withKoin
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.downloads
 import newpipe.shared.generated.resources.menu_navigation
 import newpipe.shared.generated.resources.nothing_here_but_crickets
+import newpipe.shared.generated.resources.settings
 import newpipe.shared.generated.resources.tab_about
 import newpipe.shared.generated.resources.tab_bookmarks
 import org.jetbrains.compose.resources.getString
+import org.koin.dsl.module
 
 @OptIn(ExperimentalTestApi::class)
 class DesktopNavigationShellTest {
 
-    @Test
-    fun dummyServiceHomeShowsFourTabs() = runComposeUiTest {
-        setContent {
+    private val emptySettings = module {
+        single<Settings> { MapSettings() }
+    }
+
+    private fun ComposeUiTest.setShellContent(
+        onNavigate: (Destination) -> Unit = {}
+    ) = withKoin(
+        modules = listOf(emptySettings),
+        content = {
             MaterialTheme {
-                DesktopNavigationShellContent()
+                DesktopNavigationShellContent(onNavigate = onNavigate)
             }
         }
+    )
+
+    @Test
+    fun dummyServiceHomeShowsFourTabs() = runComposeUiTest {
+        setShellContent()
 
         DummyServiceTab.entries.forEach { tab ->
             onNodeWithTag("$TEST_TAG_DUMMY_SERVICE_TAB_PREFIX${tab.name}").assertIsDisplayed()
@@ -48,11 +65,7 @@ class DesktopNavigationShellTest {
 
     @Test
     fun tabClickUpdatesSelectionAndTitle() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                DesktopNavigationShellContent()
-            }
-        }
+        setShellContent()
 
         val bookmarksTag = "$TEST_TAG_DUMMY_SERVICE_TAB_PREFIX${DummyServiceTab.BOOKMARKS.name}"
         onNodeWithTag(bookmarksTag).performClick()
@@ -64,11 +77,7 @@ class DesktopNavigationShellTest {
 
     @Test
     fun drawerShowsAndroidStyleGroupsAndBranding() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                DesktopNavigationShellContent()
-            }
-        }
+        setShellContent()
 
         onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
 
@@ -80,11 +89,7 @@ class DesktopNavigationShellTest {
 
     @Test
     fun drawerPlaceholderItemHidesTabsAndSetsTitle() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                DesktopNavigationShellContent()
-            }
-        }
+        setShellContent()
 
         onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
         onNodeWithText(getString(Res.string.downloads)).performClick()
@@ -97,6 +102,19 @@ class DesktopNavigationShellTest {
     }
 
     @Test
+    fun settingsShowsPlaceholderInsteadOfNavigating() = runComposeUiTest {
+        var navigated = false
+        setShellContent(onNavigate = { navigated = true })
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithText(getString(Res.string.settings)).performClick()
+
+        onNodeWithTag(TEST_TAG_TOP_BAR_TITLE).assertTextEquals(getString(Res.string.settings))
+        onNodeWithText(getString(Res.string.nothing_here_but_crickets)).assertIsDisplayed()
+        assertTrue(!navigated)
+    }
+
+    @Test
     fun drawerNavigationRoutesThroughSharedNavigator() = runComposeUiTest {
         var closeRequested = false
         val navigator = Navigator(
@@ -104,11 +122,7 @@ class DesktopNavigationShellTest {
             onCloseRequest = { closeRequested = true }
         )
 
-        setContent {
-            MaterialTheme {
-                DesktopNavigationShellContent(onNavigate = { navigator.navigateTo(it) })
-            }
-        }
+        setShellContent(onNavigate = { navigator.navigateTo(it) })
 
         onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
         onNodeWithText(getString(Res.string.tab_about)).performClick()
