@@ -7,6 +7,7 @@ package net.newpipe.app.navigation
 
 import androidx.compose.runtime.mutableStateListOf
 import co.touchlab.kermit.Logger
+import net.newpipe.app.screen.PlaceholderScreen
 import net.newpipe.app.screen.about.AboutScreen
 import net.newpipe.app.screen.home.DesktopNavigationShell
 import net.newpipe.app.screen.settings.SettingsHomeScreen
@@ -34,8 +35,14 @@ fun navModule() = module {
         SettingsHomeScreen()
     }
 
+    // Desktop-only mock shell; other platforms never navigate here
     navigation<Destination.DummyHome> {
         DesktopNavigationShell()
+    }
+
+    // Shared by every not-yet-implemented destination, e.g. settings categories
+    navigation<Destination.Placeholder> {
+        PlaceholderScreen()
     }
 }
 

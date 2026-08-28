@@ -23,6 +23,7 @@ import androidx.compose.ui.tooling.preview.PreviewWrapper
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.newpipe.app.composable.PreferenceRow
 import net.newpipe.app.composable.TopAppBar
+import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.preview.ThemePreviewProvider
 import net.newpipe.app.screen.settings.model.SettingsCategory
@@ -49,8 +50,12 @@ fun SettingsHomeScreen(
             SettingsCategory(
                 title = type.title,
                 icon = type.icon,
-                // TODO: Replace with a Destination once sub-screens are migrated
-                onClick = {}
+                // Bug fix: category rows previously had onClick = {}, so
+                // tapping any settings category (on any platform reaching
+                // this shared screen) silently did nothing.
+                // TODO: Replace with a dedicated Destination per category once
+                // sub-screens are migrated
+                onClick = { navigator.navigateTo(Destination.Placeholder) }
             )
         },
         onNavigateUp = { navigator.navigateUp() }

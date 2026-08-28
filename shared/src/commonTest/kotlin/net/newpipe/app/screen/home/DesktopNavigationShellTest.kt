@@ -39,6 +39,8 @@ import org.koin.dsl.module
 @OptIn(ExperimentalTestApi::class)
 class DesktopNavigationShellTest {
 
+    // A real Settings singleton is required because the shell reads
+    // currentServiceScheme() (branding), which injects Settings via Koin
     private val emptySettings = module {
         single<Settings> { MapSettings() }
     }
@@ -102,18 +104,19 @@ class DesktopNavigationShellTest {
     }
 
     @Test
-    fun settingsShowsPlaceholderInsteadOfNavigating() = runComposeUiTest {
-        var navigated = false
-        setShellContent(onNavigate = { navigated = true })
+    fun drawerSettingsRoutesToSettingsDestination() = runComposeUiTest {
+        var navigated: Destination? = null
+        setShellContent(onNavigate = { navigated = it })
 
         onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
         onNodeWithText(getString(Res.string.settings)).performClick()
 
-        onNodeWithTag(TEST_TAG_TOP_BAR_TITLE).assertTextEquals(getString(Res.string.settings))
-        onNodeWithText(getString(Res.string.nothing_here_but_crickets)).assertIsDisplayed()
-        assertTrue(!navigated)
+        assertEquals(Destination.Settings, navigated)
     }
 
+    // Uses a real Navigator (rather than a recording lambda, as the other
+    // tests do) to pin the actual backstack/exit contract for About, not
+    // just that onNavigate fired
     @Test
     fun drawerNavigationRoutesThroughSharedNavigator() = runComposeUiTest {
         var closeRequested = false

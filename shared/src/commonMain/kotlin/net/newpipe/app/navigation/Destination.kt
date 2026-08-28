@@ -24,4 +24,8 @@ sealed interface Destination : NavKey {
     /** Mocked dummy-service home shell; used as the desktop start destination */
     @Serializable
     data object DummyHome : Destination
+
+    /** Generic placeholder for a destination whose real screen isn't implemented yet */
+    @Serializable
+    data object Placeholder : Destination
 }

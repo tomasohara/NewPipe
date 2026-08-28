@@ -7,11 +7,17 @@
 // plus hamburger drawer) for a dummy streaming service. Real destinations are
 // routed through the shared Navigator, so a feature that becomes real in
 // shared code only needs its DrawerItem flipped from placeholder to
-// destination. Streamlining facilitated by Claude Code using model Fable 5.
+// destination.
+//
+// Duplicates (as a hardcoded mock, for expediency) the drawer group
+// structure and header layout of the real Android navigation drawer at
+// app/src/main/res/menu/drawer_items.xml and
+// app/src/main/res/layout/drawer_header.xml — there is no shared
+// cross-platform navigation-drawer model yet to draw from instead.
+// Streamlining facilitated by Claude Code using model Fable 5.
 
 package net.newpipe.app.screen.home
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,10 +50,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import net.newpipe.app.BuildConfig
+import net.newpipe.app.composable.EmptyPlaceholder
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
 import net.newpipe.app.theme.currentServiceScheme
@@ -72,7 +78,6 @@ import newpipe.shared.generated.resources.ic_trending_up
 import newpipe.shared.generated.resources.ic_tv
 import newpipe.shared.generated.resources.ic_volunteer_activism
 import newpipe.shared.generated.resources.menu_navigation
-import newpipe.shared.generated.resources.nothing_here_but_crickets
 import newpipe.shared.generated.resources.settings
 import newpipe.shared.generated.resources.tab_about
 import newpipe.shared.generated.resources.tab_bookmarks
@@ -116,8 +121,10 @@ private data class DrawerItem(
     val tab: DummyServiceTab? = null
 )
 
-// Android-style drawer groups and ordering: local destinations,
-// dummy-service kiosks, and options
+// Three drawer groups mirror menu_tabs_group, menu_kiosks_group, and
+// menu_options_about_group in drawer_items.xml; menu_services_group (the
+// real service switcher) has no desktop equivalent since there is only one
+// dummy service.
 private val topDrawerItems = listOf(
     DrawerItem(Res.string.tab_subscriptions, Res.drawable.ic_tv),
     DrawerItem(Res.string.whats_new, Res.drawable.ic_subscriptions),
@@ -126,15 +133,23 @@ private val topDrawerItems = listOf(
     DrawerItem(Res.string.history, Res.drawable.ic_history)
 )
 
+// Kiosk names are generic ("Featured"/"Trending") rather than tied to any
+// one real service, since this drawer belongs to the mocked dummy service
 private val dummyServiceDrawerItems = listOf(
     DrawerItem(Res.string.featured, Res.drawable.ic_stars, tab = DummyServiceTab.FEATURED),
     DrawerItem(Res.string.trending, Res.drawable.ic_trending_up)
 )
 
-// Only About & FAQ is wired to a real destination; Settings stays a mocked
-// placeholder for now, same as the rest of the drawer
+// Settings and About & FAQ are wired to real destinations; the individual
+// settings categories (not the Settings menu itself) fall back to the
+// shared placeholder screen, see SettingsHomeScreen.
+//
+// Routing About through the real Navigator/Destination.About also fixes a
+// bug from the original prototype: with a local mock page instead of a
+// real destination, About lost the dual back controls (navigate-up vs.
+// system-back-to-exit) that AboutScreen normally gets via LocalSystemBack.
 private val bottomDrawerItems = listOf(
-    DrawerItem(Res.string.settings, Res.drawable.ic_settings),
+    DrawerItem(Res.string.settings, Res.drawable.ic_settings, destination = Destination.Settings),
     DrawerItem(Res.string.donate, Res.drawable.ic_volunteer_activism),
     DrawerItem(Res.string.tab_about, Res.drawable.ic_info_outline, destination = Destination.About)
 )
@@ -156,12 +171,24 @@ fun DesktopNavigationShell(navigator: Navigator = koinInject()) {
 internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {}) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    // This composable now stays on the backstack while About/Settings are
+    // open (they're pushed via onNavigate rather than replacing this
+    // content), so selectedTab survives the round trip. In the original
+    // prototype, About was a local mock page that unmounted this whole
+    // composable, so returning from it always reset the tab back to
+    // Featured — that bug can no longer happen.
     val selectedTab = remember { mutableStateOf(DummyServiceTab.FEATURED) }
     // Non-null while a placeholder-only drawer destination is showing;
-    // null means the dummy-service home (tab row) is showing
+    // null means the dummy-service home (tab row) is showing.
+    // Also fixes a bug where the top bar kept showing the last-selected
+    // tab's title even after switching to an unrelated placeholder page
+    // (e.g. title stayed "Featured" while viewing the Downloads placeholder).
     val placeholderLabel = remember { mutableStateOf<StringResource?>(null) }
     val serviceScheme = currentServiceScheme()
 
+    // Three-way branch mirrors DrawerItem's three states: a real
+    // destination, a dummy-service tab selection, or (fallback) the shared
+    // crickets placeholder
     val onDrawerItemClick: (DrawerItem) -> Unit = { item ->
         when {
             item.destination != null -> onNavigate(item.destination)
@@ -178,6 +205,10 @@ internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
+                // Fixes a bug where the drawer content (header + up to 10
+                // items) overflowed the default 800x600 window with no way
+                // to scroll, silently clipping "About & FAQ" off the
+                // bottom and making it unreachable
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     DrawerHeader(serviceScheme)
                     DrawerGroup(TEST_TAG_DRAWER_TOP_GROUP, topDrawerItems, onDrawerItemClick)
@@ -195,6 +226,10 @@ internal fun DesktopNavigationShellContent(onNavigate: (Destination) -> Unit = {
     ) {
         Scaffold(
             topBar = {
+                // Branded with the real currently-selected service's colors
+                // (currentServiceTopAppBarColors/currentServiceScheme, also
+                // used by About/Settings) so the mock shell looks consistent
+                // with the rest of the app rather than using plain defaults
                 TopAppBar(
                     colors = currentServiceTopAppBarColors(serviceScheme),
                     title = {
@@ -277,6 +312,11 @@ private fun DrawerGroup(
     }
 }
 
+// Duplicates the two-row layout (app icon + name, then service icon +
+// name) of app/src/main/res/layout/drawer_header.xml, done for expediency
+// since Compose Multiplatform can't reuse an Android XML layout directly;
+// the service row is static "Dummy Service" text rather than a real
+// service switcher
 @Composable
 private fun DrawerHeader(serviceScheme: ColorScheme) {
     Surface(
@@ -314,23 +354,6 @@ private fun DrawerHeader(serviceScheme: ColorScheme) {
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-        }
-    }
-}
-
-// Kaomoji is hardcoded (not translated) to match the Android empty-list view
-// at app/src/main/res/layout/list_empty_view.xml
-@Composable
-private fun EmptyPlaceholder() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "¯\\_(ツ)_/¯", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                modifier = Modifier.padding(top = 6.dp),
-                text = stringResource(Res.string.nothing_here_but_crickets),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

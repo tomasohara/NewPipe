@@ -3,6 +3,16 @@
   ~ SPDX-FileCopyrightText: 2026 NewPipe e.V. <https://newpipe-ev.de>
   ~ SPDX-License-Identifier: GPL-3.0-or-later
   -->
+<!-- Duplicates app/src/main/res/drawable/ic_subscriptions.xml (same path
+     data), for expediency: Compose Multiplatform resources live in a
+     separate module resource tree and can't reference the Android app
+     module's res/drawable directly.
+
+     Bug fix: this file previously held an unrelated "list with a play
+     arrow" glyph instead of Android's real subscriptions-tray shape, while
+     the sibling ic_tv.xml held this file's own correct shape by mistake.
+     Both files now match their real Android same-named originals, fixing
+     wrong icons on the "What's New" tab/drawer item. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -10,5 +20,5 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#000000"
-        android:pathData="M3,6h18v2L3,8zM3,11h18v2L3,13zM3,16h12v2L3,18zM18,16l3,3 -3,3z" />
+        android:pathData="M20,8L4,8L4,6h16v2zM18,2L6,2v2h12L18,2zM22,12v8c0,1.1 -0.9,2 -2,2L4,22c-1.1,0 -2,-0.9 -2,-2v-8c0,-1.1 0.9,-2 2,-2h16c1.1,0 2,0.9 2,2zM16,16l-6,-3.27v6.53L16,16z" />
 </vector>

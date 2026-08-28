@@ -3,6 +3,14 @@
   ~ SPDX-FileCopyrightText: 2026 NewPipe e.V. <https://newpipe-ev.de>
   ~ SPDX-License-Identifier: GPL-3.0-or-later
   -->
+<!-- Duplicates app/src/main/res/drawable/ic_bookmark.xml (same path data),
+     for expediency: Compose Multiplatform resources live in a separate
+     module resource tree and can't reference the Android app module's
+     res/drawable directly.
+
+     Bug fix: this file previously used a hand-approximated bookmark shape
+     with different proportions (left/right edges and notch depth) than
+     Android's real icon, instead of copying it exactly. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -10,5 +18,5 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#000000"
-        android:pathData="M6,3c-1.1,0 -2,0.9 -2,2v16l8,-3.5L20,21L20,5c0,-1.1 -0.9,-2 -2,-2z" />
+        android:pathData="M17,3H7c-1.1,0 -1.99,0.9 -1.99,2L5,21l7,-3 7,3V5c0,-1.1 -0.9,-2 -2,-2z" />
 </vector>
