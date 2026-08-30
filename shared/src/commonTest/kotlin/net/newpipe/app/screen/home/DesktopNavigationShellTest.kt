@@ -17,38 +17,41 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.russhwolf.settings.MapSettings
 import com.russhwolf.settings.Settings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import net.newpipe.app.Constants.KEY_STREAMING_SERVICE
 import net.newpipe.app.extensions.withKoin
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
+import net.newpipe.app.theme.Service
 import newpipe.shared.generated.resources.Res
 import newpipe.shared.generated.resources.downloads
 import newpipe.shared.generated.resources.menu_navigation
 import newpipe.shared.generated.resources.nothing_here_but_crickets
+import newpipe.shared.generated.resources.radio
 import newpipe.shared.generated.resources.settings
 import newpipe.shared.generated.resources.tab_about
 import newpipe.shared.generated.resources.tab_bookmarks
+import newpipe.shared.generated.resources.trending_gaming
 import org.jetbrains.compose.resources.getString
 import org.koin.dsl.module
 
 @OptIn(ExperimentalTestApi::class)
 class DesktopNavigationShellTest {
 
-    // A real Settings singleton is required because the shell reads
-    // currentServiceScheme() (branding), which injects Settings via Koin
-    private val emptySettings = module {
-        single<Settings> { MapSettings() }
-    }
-
+    // No Koin modules needed anymore: shell branding now follows the
+    // locally selected DummyService instead of injecting Settings via
+    // currentServiceScheme(). withKoin is kept for consistency with the
+    // other screen tests (and its stopKoin cleanup).
     private fun ComposeUiTest.setShellContent(
         onNavigate: (Destination) -> Unit = {}
     ) = withKoin(
-        modules = listOf(emptySettings),
+        modules = emptyList(),
         content = {
             MaterialTheme {
                 DesktopNavigationShellContent(onNavigate = onNavigate)
@@ -89,6 +92,71 @@ class DesktopNavigationShellTest {
         onNodeWithTag(TEST_TAG_DRAWER_BOTTOM_GROUP).assertIsDisplayed()
     }
 
+    // The switch control mirrors Android's three-component service switcher
+    // (icon + name + arrow): clicking it toggles the drawer body between the
+    // main menu and the service-selection menu, and selecting the other
+    // service updates the header plus the per-service kiosk group
+    @Test
+    fun serviceSwitcherTogglesMenuAndSelectsOtherService() = runComposeUiTest {
+        setShellContent()
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithTag(TEST_TAG_SERVICE_SWITCHER).assertIsDisplayed()
+        onNodeWithText(DummyService.DUMMY_TUBE.serviceName).assertIsDisplayed()
+        // DummyTube mirrors YouTube's six-kiosk group; no Radio kiosk
+        onNodeWithText(getString(Res.string.trending_gaming)).assertExists()
+        onNodeWithText(getString(Res.string.radio)).assertDoesNotExist()
+
+        // Toggle to the service-selection menu: it replaces the main menu
+        onNodeWithTag(TEST_TAG_SERVICE_SWITCHER).performClick()
+        onNodeWithTag(TEST_TAG_DRAWER_SERVICE_MENU).assertIsDisplayed()
+        onNodeWithTag(TEST_TAG_DRAWER_TOP_GROUP).assertDoesNotExist()
+        DummyService.entries.forEach { service ->
+            onNodeWithTag("$TEST_TAG_SERVICE_OPTION_PREFIX${service.name}").assertIsDisplayed()
+        }
+
+        // Selecting the other service returns to the main menu, rebranded
+        onNodeWithTag("$TEST_TAG_SERVICE_OPTION_PREFIX${DummyService.DUMMYCAMP.name}")
+            .performClick()
+        onNodeWithTag(TEST_TAG_DRAWER_SERVICE_MENU).assertDoesNotExist()
+        onNodeWithText(DummyService.DUMMYCAMP.serviceName).assertIsDisplayed()
+        onNodeWithText(DummyService.DUMMY_TUBE.serviceName).assertDoesNotExist()
+        // Dummycamp mirrors Bandcamp's Featured + Radio kiosk group
+        onNodeWithText(getString(Res.string.radio)).assertExists()
+        onNodeWithText(getString(Res.string.trending_gaming)).assertDoesNotExist()
+    }
+
+    // Exercises the Koin-injected wrapper: selecting a dummy service must
+    // store its real counterpart's name under the same Settings key the
+    // real app uses. This is what keeps the selection alive across the
+    // About/Settings round trip (the shell is unmounted meanwhile) and
+    // brands those screens' currentService()-based headers consistently.
+    @Test
+    fun serviceSelectionStoresRealCounterpartInSettings() = runComposeUiTest {
+        val settings = MapSettings()
+        withKoin(
+            modules = listOf(
+                module {
+                    single<Settings> { settings }
+                    single {
+                        Navigator(startDestination = Destination.DummyHome, onCloseRequest = {})
+                    }
+                }
+            ),
+            content = { MaterialTheme { DesktopNavigationShell() } }
+        )
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithTag(TEST_TAG_SERVICE_SWITCHER).performClick()
+        onNodeWithTag("$TEST_TAG_SERVICE_OPTION_PREFIX${DummyService.DUMMYCAMP.name}")
+            .performClick()
+
+        assertEquals(
+            Service.BANDCAMP.serviceName,
+            settings.getString(KEY_STREAMING_SERVICE, "")
+        )
+    }
+
     @Test
     fun drawerPlaceholderItemHidesTabsAndSetsTitle() = runComposeUiTest {
         setShellContent()
@@ -109,7 +177,9 @@ class DesktopNavigationShellTest {
         setShellContent(onNavigate = { navigated = it })
 
         onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
-        onNodeWithText(getString(Res.string.settings)).performClick()
+        // The six DummyTube kiosks push the bottom group below the fold of
+        // the scrollable drawer, so scroll the item into view first
+        onNodeWithText(getString(Res.string.settings)).performScrollTo().performClick()
 
         assertEquals(Destination.Settings, navigated)
     }
@@ -128,7 +198,8 @@ class DesktopNavigationShellTest {
         setShellContent(onNavigate = { navigator.navigateTo(it) })
 
         onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
-        onNodeWithText(getString(Res.string.tab_about)).performClick()
+        // Scroll needed for the same reason as in the Settings test above
+        onNodeWithText(getString(Res.string.tab_about)).performScrollTo().performClick()
         assertEquals(
             listOf<Destination>(Destination.DummyHome, Destination.About),
             navigator.backstack.toList()

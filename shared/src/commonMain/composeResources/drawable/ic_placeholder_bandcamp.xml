@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ SPDX-FileCopyrightText: 2026 NewPipe e.V. <https://newpipe-ev.de>
+  ~ SPDX-License-Identifier: GPL-3.0-or-later
+  -->
+<!-- Duplicates app/src/main/res/drawable/ic_placeholder_bandcamp.xml (same path data),
+     for expediency: Compose Multiplatform resources live in a separate
+     module resource tree and can't reference the Android app module's
+     res/drawable directly. The android:tint attribute of the original
+     is dropped because its @color reference can't resolve here;
+     Compose's Icon applies LocalContentColor instead. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:height="24dp"
+    android:width="24dp"
+    android:viewportHeight="97.75"
+    android:viewportWidth="97.75"
+>
+    <path
+        android:pathData="M48.875,0C21.882,0 0,21.882 0,48.875S21.882,97.75 48.875,97.75 97.75,75.868 97.75,48.875 75.868,0 48.875,0zM64.835,70.857L12.593,70.857l20.32,-43.965h52.244L64.835,70.857z"
+        android:fillColor="#FF000000" />
+</vector>

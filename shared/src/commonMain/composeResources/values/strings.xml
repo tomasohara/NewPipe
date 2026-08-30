@@ -36,10 +36,18 @@
     <string name="done">Done</string>
     <string name="not_available">Not available</string>
 
-    <!-- Desktop navigation shell -->
-    <string name="dummy_service">Dummy Service</string>
+    <!-- Desktop navigation shell (service names live in the DummyService
+         enum as plain strings, matching the real Service enum). Kiosk
+         strings duplicate their same-named entries in
+         app/src/main/res/values/strings.xml, for expediency. -->
     <string name="featured">Featured</string>
+    <string name="radio">Radio</string>
     <string name="trending">Trending</string>
+    <string name="trending_gaming">Gaming trends</string>
+    <string name="trending_music">Trending music</string>
+    <string name="trending_movies">Trending movies and shows</string>
+    <string name="trending_podcasts">Trending podcasts</string>
+    <string name="duration_live">Live</string>
     <string name="whats_new">What's New</string>
     <string name="tab_subscriptions">Subscriptions</string>
     <string name="tab_bookmarks">Bookmarks</string>
