@@ -491,6 +491,8 @@
     <string name="enable_disposed_exceptions_summary">Force reporting of undeliverable Rx exceptions outside of fragment or activity lifecycle after disposal</string>
     <string name="show_original_time_ago_title">Show original time ago on items</string>
     <string name="show_original_time_ago_summary">Original texts from services will be visible in stream items</string>
+    <string name="show_dummy_services_title">Show dummy services</string>
+    <string name="show_dummy_services_summary">List the dummy services fronting the in-progress Compose interface in the drawer\'s service menu</string>
     <string name="disable_media_tunneling_title">Disable media tunneling</string>
     <string name="disable_media_tunneling_summary">Disable media tunneling if you experience a black screen or stuttering on video playback.</string>
     <string name="disable_media_tunneling_automatic_info">Media tunneling was disabled by default on your device because your device model is known to not support it.</string>

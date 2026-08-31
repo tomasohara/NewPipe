@@ -8,6 +8,7 @@
 package net.newpipe.app.screen.home
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -25,6 +26,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import net.newpipe.app.Constants.KEY_STREAMING_SERVICE
+import net.newpipe.app.LocalRealServiceHandoff
 import net.newpipe.app.extensions.withKoin
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
@@ -155,6 +157,66 @@ class DesktopNavigationShellTest {
             Service.BANDCAMP.serviceName,
             settings.getString(KEY_STREAMING_SERVICE, "")
         )
+    }
+
+    // Real services appear in the service menu only when a classic-interface
+    // handoff is available (Android); desktop provides none, so its menu must
+    // keep showing just the dummy services
+    @Test
+    fun realServicesHiddenWithoutClassicInterfaceHandoff() = runComposeUiTest {
+        setShellContent()
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithTag(TEST_TAG_SERVICE_SWITCHER).performClick()
+        onNodeWithTag(TEST_TAG_DRAWER_SERVICE_MENU).assertIsDisplayed()
+        Service.entries.forEach { service ->
+            onNodeWithTag("$TEST_TAG_REAL_SERVICE_OPTION_PREFIX${service.name}")
+                .assertDoesNotExist()
+        }
+    }
+
+    // Full Android co-existence chain through the Koin wrapper and
+    // LocalRealServiceHandoff: picking a real service in the service menu
+    // persists it under the shared key BEFORE invoking the platform handoff,
+    // so the classic interface resumes already switched to that service
+    @Test
+    fun realServiceSelectionPersistsThenHandsOff() = runComposeUiTest {
+        val settings = MapSettings()
+        var handedOff: Service? = null
+        withKoin(
+            modules = listOf(
+                module {
+                    single<Settings> { settings }
+                    single {
+                        Navigator(startDestination = Destination.DummyHome, onCloseRequest = {})
+                    }
+                }
+            ),
+            content = {
+                CompositionLocalProvider(
+                    LocalRealServiceHandoff provides { service ->
+                        // Pin the persist-before-handoff ordering contract
+                        assertEquals(
+                            service.serviceName,
+                            settings.getString(KEY_STREAMING_SERVICE, "")
+                        )
+                        handedOff = service
+                    }
+                ) {
+                    MaterialTheme { DesktopNavigationShell() }
+                }
+            }
+        )
+
+        onNodeWithContentDescription(getString(Res.string.menu_navigation)).performClick()
+        onNodeWithTag(TEST_TAG_SERVICE_SWITCHER).performClick()
+        // Seven services can push this row below the fold of the scrollable
+        // drawer, so bring it into view first
+        onNodeWithTag("$TEST_TAG_REAL_SERVICE_OPTION_PREFIX${Service.SOUNDCLOUD.name}")
+            .performScrollTo()
+            .performClick()
+
+        assertEquals(Service.SOUNDCLOUD, handedOff)
     }
 
     @Test

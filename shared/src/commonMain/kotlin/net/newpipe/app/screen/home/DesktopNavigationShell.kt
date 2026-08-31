@@ -3,12 +3,20 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-// Desktop-only navigation shell: mocks the Android main navigation (home tabs
+// Dummy-service navigation shell: mocks the Android main navigation (home tabs
 // plus hamburger drawer) for two mocked streaming services (DummyTube and
 // Dummmycamp), switchable from the drawer header the same way the real app
 // switches services. Real destinations are routed through the shared
 // Navigator, so a feature that becomes real in shared code only needs its
 // DrawerItem flipped from placeholder to destination.
+//
+// On desktop this is the start destination (the only interface there); on
+// Android it co-exists with the classic View-based interface: debug builds
+// list the dummy services in MainActivity's drawer service menu (opening
+// this shell via ComposeActivity), and this shell's own service menu lists
+// the real services in return, handing the screen back to the classic
+// interface via LocalRealServiceHandoff.
+// Android co-existence facilitated by Claude Code using model Claude Fable 5.
 //
 // Duplicates (as a hardcoded mock, for expediency) the drawer group
 // structure and header layout of the real Android navigation drawer at
@@ -65,6 +73,7 @@ import com.russhwolf.settings.Settings
 import kotlinx.coroutines.launch
 import net.newpipe.app.BuildConfig
 import net.newpipe.app.Constants.KEY_STREAMING_SERVICE
+import net.newpipe.app.LocalRealServiceHandoff
 import net.newpipe.app.composable.EmptyPlaceholder
 import net.newpipe.app.navigation.Destination
 import net.newpipe.app.navigation.Navigator
@@ -79,6 +88,7 @@ import newpipe.shared.generated.resources.featured
 import newpipe.shared.generated.resources.history
 import newpipe.shared.generated.resources.ic_arrow_drop_down
 import newpipe.shared.generated.resources.ic_bookmark
+import newpipe.shared.generated.resources.ic_cloud
 import newpipe.shared.generated.resources.ic_file_download
 import newpipe.shared.generated.resources.ic_foreground
 import newpipe.shared.generated.resources.ic_history
@@ -88,6 +98,8 @@ import newpipe.shared.generated.resources.ic_menu
 import newpipe.shared.generated.resources.ic_movie
 import newpipe.shared.generated.resources.ic_music_note
 import newpipe.shared.generated.resources.ic_placeholder_bandcamp
+import newpipe.shared.generated.resources.ic_placeholder_media_ccc
+import newpipe.shared.generated.resources.ic_placeholder_peertube
 import newpipe.shared.generated.resources.ic_podcasts
 import newpipe.shared.generated.resources.ic_radio
 import newpipe.shared.generated.resources.ic_settings
@@ -125,6 +137,7 @@ internal const val TEST_TAG_DRAWER_HEADER = "drawer_header"
 internal const val TEST_TAG_SERVICE_SWITCHER = "drawer_service_switcher"
 internal const val TEST_TAG_DRAWER_SERVICE_MENU = "drawer_service_menu"
 internal const val TEST_TAG_SERVICE_OPTION_PREFIX = "drawer_service_option_"
+internal const val TEST_TAG_REAL_SERVICE_OPTION_PREFIX = "drawer_real_service_option_"
 
 /**
  * Mocked streaming services selectable from the drawer header. DummyTube
@@ -134,8 +147,11 @@ internal const val TEST_TAG_SERVICE_OPTION_PREFIX = "drawer_service_option_"
  * drawer is the service name. Selecting one stores [realService] in the
  * shared Settings, so screens that brand via currentService() (About,
  * Settings, ...) pick up the matching colors.
+ *
+ * Public (not internal) because Android's MainActivity also lists these
+ * entries in the classic drawer's service menu.
  */
-internal enum class DummyService(
+enum class DummyService(
     val serviceName: String,
     val icon: DrawableResource,
     val realService: Service
@@ -206,6 +222,17 @@ private fun kioskItemsFor(service: DummyService) = when (service) {
     DummyService.DUMMYCAMP -> dummycampKioskItems
 }
 
+// Shared-resource counterparts of the per-service icons ServiceHelper.getIcon()
+// assigns on Android, so the real services look the same in both drawers
+private val Service.menuIcon: DrawableResource
+    get() = when (this) {
+        Service.YOUTUBE -> Res.drawable.ic_smart_display
+        Service.SOUNDCLOUD -> Res.drawable.ic_cloud
+        Service.MEDIA_CCC -> Res.drawable.ic_placeholder_media_ccc
+        Service.PEERTUBE -> Res.drawable.ic_placeholder_peertube
+        Service.BANDCAMP -> Res.drawable.ic_placeholder_bandcamp
+    }
+
 // Settings and About & FAQ are wired to real destinations; the individual
 // settings categories (not the Settings menu itself) fall back to the
 // shared placeholder screen, see SettingsHomeScreen.
@@ -229,6 +256,9 @@ fun DesktopNavigationShell(
     navigator: Navigator = koinInject(),
     settings: Settings = koinInject()
 ) {
+    // Present only where a classic interface exists to hand off to (Android);
+    // persist the picked service first so the classic side resumes onto it
+    val realServiceHandoff = LocalRealServiceHandoff.current
     // Bug fix: the selected service used to live only in a remember inside
     // the shell content, but NavDisplay composes just the top backstack
     // entry, so opening About/Settings dropped that state and the shell
@@ -248,7 +278,13 @@ fun DesktopNavigationShell(
         onServiceSelected = { service ->
             settings.putString(KEY_STREAMING_SERVICE, service.realService.serviceName)
         },
-        onNavigate = { navigator.navigateTo(it) }
+        onNavigate = { navigator.navigateTo(it) },
+        onRealServiceSelected = realServiceHandoff?.let { handoff ->
+            { service ->
+                settings.putString(KEY_STREAMING_SERVICE, service.serviceName)
+                handoff(service)
+            }
+        }
     )
 }
 
@@ -257,12 +293,15 @@ fun DesktopNavigationShell(
  * @param initialService Mocked service selected when the shell (re)appears
  * @param onServiceSelected Callback when the user picks a different service
  * @param onNavigate Callback to navigate to a real (non-mocked) destination
+ * @param onRealServiceSelected Callback when the user picks a real service to leave the
+ * dummy shell for the classic interface; null (e.g. on desktop) hides the real services
  */
 @Composable
 internal fun DesktopNavigationShellContent(
     initialService: DummyService = DummyService.DUMMY_TUBE,
     onServiceSelected: (DummyService) -> Unit = {},
-    onNavigate: (Destination) -> Unit = {}
+    onNavigate: (Destination) -> Unit = {},
+    onRealServiceSelected: ((Service) -> Unit)? = null
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -373,6 +412,33 @@ internal fun DesktopNavigationShellContent(
                                         serviceMenuOpen.value = false
                                     }
                                 )
+                            }
+                            // Real services co-existing with the dummies
+                            // (Android only, see onRealServiceSelected):
+                            // picking one is an exit to the classic
+                            // interface rather than an in-shell selection,
+                            // so the rows never show a selected state
+                            if (onRealServiceSelected != null) {
+                                HorizontalDivider()
+                                Service.entries.forEach { service ->
+                                    NavigationDrawerItem(
+                                        modifier = Modifier
+                                            .padding(NavigationDrawerItemDefaults.ItemPadding)
+                                            .testTag(
+                                                "$TEST_TAG_REAL_SERVICE_OPTION_PREFIX" +
+                                                    service.name
+                                            ),
+                                        icon = {
+                                            Icon(
+                                                painter = painterResource(service.menuIcon),
+                                                contentDescription = null
+                                            )
+                                        },
+                                        label = { Text(service.serviceName) },
+                                        selected = false,
+                                        onClick = { onRealServiceSelected(service) }
+                                    )
+                                }
                             }
                         }
                     } else {

@@ -32,7 +32,13 @@ class ComposeActivity : ComponentActivity() {
                     intent.getStringExtra(Constants.INTENT_SCREEN_KEY)!!
                 ),
                 onCloseRequest = ::finish,
-                onSystemBack = { onBackPressedDispatcher.onBackPressed() }
+                onSystemBack = { onBackPressedDispatcher.onBackPressed() },
+                // Picking a real service in the dummy shell returns to the
+                // classic interface: the selection is already persisted (in
+                // the SharedPreferences both interfaces read), so finishing
+                // is enough — MainActivity re-themes on resume.
+                // Handoff facilitated by Claude Code using model Claude Fable 5.
+                onRealServiceSelected = { finish() }
             ) {
                 val view = LocalView.current
                 val service = currentService()

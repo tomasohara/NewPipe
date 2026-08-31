@@ -35,7 +35,8 @@ fun navModule() = module {
         SettingsHomeScreen()
     }
 
-    // Desktop-only mock shell; other platforms never navigate here
+    // Dummy-service mock shell: desktop's start destination; Android debug
+    // builds reach it from the classic drawer's service menu
     navigation<Destination.DummyHome> {
         DesktopNavigationShell()
     }

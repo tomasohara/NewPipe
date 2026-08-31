@@ -60,6 +60,8 @@ import androidx.preference.PreferenceManager;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
+import net.newpipe.app.screen.home.DummyService;
+
 import org.schabi.newpipe.databinding.ActivityMainBinding;
 import org.schabi.newpipe.databinding.DrawerHeaderBinding;
 import org.schabi.newpipe.databinding.DrawerLayoutBinding;
@@ -117,6 +119,8 @@ public class MainActivity extends AppCompatActivity {
     private ActionBarDrawerToggle toggle;
 
     private boolean servicesShown = false;
+    // Service id the current theme was applied for, see onCreate/onResume
+    private int themedServiceId;
 
     private BroadcastReceiver broadcastReceiver;
 
@@ -128,6 +132,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int ITEM_ID_SETTINGS = 0;
     private static final int ITEM_ID_DONATION = 1;
     private static final int ITEM_ID_ABOUT = 2;
+    // Dummy services (Compose shell) listed after the real ones in the drawer's
+    // service menu; base offset keeps their item ids clear of real service ids.
+    // Dummy-service co-existence facilitated by Claude Code using model Claude Fable 5.
+    private static final int ITEM_ID_DUMMY_SERVICE_BASE = 1000;
 
     private static final int ORDER = 0;
     public static final String KEY_IS_IN_BACKGROUND = "is_in_background";
@@ -147,7 +155,11 @@ public class MainActivity extends AppCompatActivity {
 
         Localization.migrateAppLanguageSettingIfNecessary(getApplicationContext());
         ThemeHelper.setDayNightMode(this);
-        ThemeHelper.setTheme(this, ServiceHelper.getSelectedServiceId(this));
+        // OLD: ThemeHelper.setTheme(this, ServiceHelper.getSelectedServiceId(this));
+        // Remember which service the theme was built for, so onResume can
+        // detect a service switched elsewhere (e.g. in the Compose shell)
+        themedServiceId = ServiceHelper.getSelectedServiceId(this);
+        ThemeHelper.setTheme(this, themedServiceId);
 
         // Fixes text color turning black in dark/black mode:
         // https://github.com/TeamNewPipe/NewPipe/issues/12016
@@ -322,7 +334,11 @@ public class MainActivity extends AppCompatActivity {
     private boolean drawerItemSelected(final MenuItem item) {
         final int groupId = item.getGroupId();
         if (groupId == R.id.menu_services_group) {
-            changeService(item);
+            if (item.getItemId() >= ITEM_ID_DUMMY_SERVICE_BASE) {
+                dummyServiceSelected(item);
+            } else {
+                changeService(item);
+            }
         } else if (groupId == R.id.menu_tabs_group) {
             tabSelected(item);
         } else if (groupId == R.id.menu_kiosks_group) {
@@ -339,6 +355,21 @@ public class MainActivity extends AppCompatActivity {
 
         mainBinding.getRoot().closeDrawers();
         return true;
+    }
+
+    /**
+     * Opens the Compose-based dummy-service shell for the selected dummy service.
+     * Each dummy aliases a real service; storing that alias as the current
+     * service (the Compose side reads the same preference) makes the shell open
+     * on the chosen dummy, and this activity re-theme to match on return.
+     *
+     * @param item the selected dummy-service drawer item
+     */
+    private void dummyServiceSelected(final MenuItem item) {
+        final DummyService dummy =
+                DummyService.values()[item.getItemId() - ITEM_ID_DUMMY_SERVICE_BASE];
+        ServiceHelper.setSelectedServiceId(this, dummy.getRealService().getServiceId());
+        NavigationHelper.openDummyShell(this);
     }
 
     private void changeService(final MenuItem item) {
@@ -452,6 +483,24 @@ public class MainActivity extends AppCompatActivity {
                 enhancePeertubeMenu(menuItem);
             }
         }
+        // OLD: if (DEBUG) {
+        if (DEBUG && sharedPreferences.getBoolean(
+                getString(R.string.show_dummy_services_key), true)) {
+            // Dummy services front the in-progress Compose interface, which
+            // supplements this classic one: selecting a dummy row hands the
+            // screen to the Compose shell (see dummyServiceSelected), whose own
+            // service menu lists the real services to hand it back. Appended
+            // after the real services so the positional getItem(serviceId)
+            // lookups below stay valid; debug builds only for now, and
+            // togglable there via Settings > Debug > Show dummy services.
+            for (final DummyService dummy : DummyService.values()) {
+                drawerLayoutBinding.navigation.getMenu()
+                        .add(R.id.menu_services_group,
+                                ITEM_ID_DUMMY_SERVICE_BASE + dummy.ordinal(), ORDER,
+                                dummy.getServiceName())
+                        .setIcon(ServiceHelper.getIcon(dummy.getRealService().getServiceId()));
+            }
+        }
         drawerLayoutBinding.navigation.getMenu()
                 .getItem(ServiceHelper.getSelectedServiceId(this))
                 .setChecked(true);
@@ -543,6 +592,17 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Theme has changed, recreating activity...");
             }
             sharedPrefEditor.putBoolean(Constants.KEY_THEME_CHANGE, false).apply();
+            ActivityCompat.recreate(this);
+        }
+
+        // The selected service can change while this activity is paused (the
+        // Compose dummy shell shares the same preference); recreate to
+        // re-theme, mirroring what the drawer-close listener does for
+        // in-drawer service changes
+        if (themedServiceId != ServiceHelper.getSelectedServiceId(this)) {
+            if (DEBUG) {
+                Log.d(TAG, "Service has changed while paused, recreating activity...");
+            }
             ActivityCompat.recreate(this);
         }
 

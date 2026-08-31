@@ -687,6 +687,18 @@ public final class NavigationHelper {
         ContextKt.navigateTo(context, Destination.About.INSTANCE);
     }
 
+    /**
+     * Opens the Compose-based dummy-service shell (the in-progress new interface),
+     * which co-exists with this classic interface behind extra entries in the
+     * drawer's service menu (debug builds only, see MainActivity#showServices).
+     * Addition facilitated by Claude Code using model Claude Fable 5.
+     *
+     * @param context the context to launch the shell's activity from
+     */
+    public static void openDummyShell(final Context context) {
+        ContextKt.navigateTo(context, Destination.DummyHome.INSTANCE);
+    }
+
     public static void openSettings(final Context context) {
         // TODO: Replace with "ContextKt.navigateTo(context, Destination.Settings.INSTANCE);" later
         final Intent intent = new Intent(context, SettingsActivity.class);
